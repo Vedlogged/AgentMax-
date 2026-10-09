@@ -83,6 +83,7 @@ export default function Home() {
   const bottomRef = useRef<HTMLDivElement>(null);
 
   const [activeApiKey, setActiveApiKey] = useState("");
+  const [inlineKey, setInlineKey] = useState("");
 
   const loadStatus = () =>
     fetch("/api/agent")
@@ -103,6 +104,7 @@ export default function Home() {
       const saved = localStorage.getItem("agent_gemini_api_key");
       if (saved) {
         setActiveApiKey(saved);
+        setInlineKey(saved);
       }
     } catch {}
   }, []);
@@ -122,9 +124,8 @@ export default function Home() {
     setCreating(false);
   }
 
-  async function handleSaveKey(e?: React.FormEvent) {
-    if (e) e.preventDefault();
-    const trimmed = apiKeyInput.trim();
+  async function handleSaveKeyDirect(key: string) {
+    const trimmed = key.trim();
     if (!trimmed) return;
     setSavingKey(true);
     try {
@@ -144,17 +145,25 @@ export default function Home() {
     setSavingKey(false);
   }
 
-  async function send(text: string) {
+  async function handleSaveKey(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    await handleSaveKeyDirect(apiKeyInput);
+  }
+
+  async function send(text: string, overrideKey?: string) {
     if (!text.trim() || thinking) return;
 
-    if (!ready) {
+    const keyToUse = overrideKey || activeApiKey;
+    const isReady = Boolean(status?.hasApiKey || keyToUse);
+
+    if (!isReady) {
       setShowKeyInput(true);
       setMessages((m) => [
         ...m,
         { role: "user", text },
         {
           role: "agent",
-          text: "🔑 Gemini API key needed: Please enter your key in Setup Step 01 above and click Connect.",
+          text: "🔑 Gemini API key needed: Paste your key below to connect and run this query.",
           error: true,
         },
       ]);
@@ -171,7 +180,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          apiKey: activeApiKey || undefined,
+          apiKey: keyToUse || undefined,
           messages: history.filter((m) => !m.error).map(({ role, text: msgText }) => ({ role, text: msgText })),
         }),
       });
@@ -443,11 +452,47 @@ export default function Home() {
                       <div
                         className={cn(
                           "px-4 py-2.5 whitespace-pre-wrap rounded-sm text-sm",
-                          m.error ? "flex gap-2 bg-destructive/10 text-destructive border border-destructive/20" : "bg-muted text-foreground"
+                          m.error ? "flex flex-col gap-2 bg-destructive/10 text-destructive border border-destructive/20" : "bg-muted text-foreground"
                         )}
                       >
-                        {m.error && <CircleAlert className="mt-0.5 size-4 shrink-0" />}
-                        {m.text}
+                        <div className="flex gap-2">
+                          {m.error && <CircleAlert className="mt-0.5 size-4 shrink-0" />}
+                          <div>{m.text}</div>
+                        </div>
+
+                        {m.error && !ready && (
+                          <div className="flex flex-col gap-2 pt-2 border-t border-destructive/20 mt-1">
+                            <div className="flex gap-2">
+                              <Input
+                                type="password"
+                                placeholder="Paste Gemini API key (AQ... or AIza...)"
+                                value={inlineKey}
+                                onChange={(e) => setInlineKey(e.target.value)}
+                                className="h-8 text-xs font-mono bg-background text-foreground border-border"
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                disabled={!inlineKey.trim()}
+                                onClick={async () => {
+                                  if (!inlineKey.trim()) return;
+                                  const key = inlineKey.trim();
+                                  await handleSaveKeyDirect(key);
+                                  const lastUser = messages.filter((msg) => msg.role === "user").pop();
+                                  if (lastUser) {
+                                    send(lastUser.text, key);
+                                  }
+                                }}
+                                className="cursor-pointer text-xs font-mono whitespace-nowrap bg-primary text-primary-foreground"
+                              >
+                                Connect & Run ↵
+                              </Button>
+                            </div>
+                            <p className="text-[10px] text-muted-foreground">
+                              Keys are stored locally in your browser for this deployment.
+                            </p>
+                          </div>
+                        )}
                       </div>
                     </div>
                   </div>
