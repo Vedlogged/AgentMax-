@@ -8,15 +8,16 @@ import {
   CircleAlert,
   Copy,
   ExternalLink,
+  KeyRound,
   RefreshCw,
   RotateCcw,
   SendHorizontal,
   Wallet,
+  Sparkles,
 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardAction, CardContent, CardFooter, CardHeader } from "@/components/ui/card";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
@@ -36,19 +37,42 @@ const EXAMPLES = [
   "Roll a 20 sided dice",
 ];
 
+const TOOL_PROMPTS: Record<string, string> = {
+  get_weather: "What's the weather in Mumbai?",
+  get_market_intel: "Get market intel on ETH",
+  get_my_wallet: "What's in your wallet?",
+  get_crypto_price: "What is the price of Bitcoin?",
+  get_country_info: "What's the capital of Japan?",
+  get_joke: "Tell me a joke",
+  roll_dice: "Roll a 20 sided dice",
+};
+
 export default function Home() {
   const [status, setStatus] = useState<Status | null>(null);
   const [wallet, setWallet] = useState<WalletInfo | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
+  const [apiKeyInput, setApiKeyInput] = useState("");
+  const [savingKey, setSavingKey] = useState(false);
+  const [showKeyInput, setShowKeyInput] = useState(false);
   const [thinking, setThinking] = useState(false);
   const [creating, setCreating] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
-  const loadWallet = () => fetch("/api/wallet").then((r) => r.json()).then(setWallet);
+  const loadStatus = () =>
+    fetch("/api/agent")
+      .then((r) => r.json())
+      .then(setStatus)
+      .catch(() => {});
+
+  const loadWallet = () =>
+    fetch("/api/wallet")
+      .then((r) => r.json())
+      .then(setWallet)
+      .catch(() => {});
 
   useEffect(() => {
-    fetch("/api/agent").then((r) => r.json()).then(setStatus);
+    loadStatus();
     loadWallet();
   }, []);
 
@@ -56,11 +80,37 @@ export default function Home() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages, thinking]);
 
-  async function createWallet() {
+  async function createWallet(reset = false) {
     setCreating(true);
-    await fetch("/api/wallet", { method: "POST" });
+    await fetch("/api/wallet", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reset }),
+    }).catch(() => {});
     await loadWallet();
     setCreating(false);
+  }
+
+  async function handleSaveKey(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    if (!apiKeyInput.trim()) return;
+    setSavingKey(true);
+    try {
+      const res = await fetch("/api/config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: apiKeyInput.trim() }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setShowKeyInput(false);
+        setApiKeyInput("");
+        await loadStatus();
+      }
+    } catch {
+      // ignore
+    }
+    setSavingKey(false);
   }
 
   async function send(text: string) {
@@ -74,13 +124,23 @@ export default function Home() {
       const res = await fetch("/api/agent", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages: history.filter((m) => !m.error).map(({ role, text }) => ({ role, text })) }),
+        body: JSON.stringify({
+          messages: history.filter((m) => !m.error).map(({ role, text: msgText }) => ({ role, text: msgText })),
+        }),
       });
       const data = await res.json();
-      setMessages((m) => [...m, data.error ? { role: "agent", text: data.error, error: true } : { role: "agent", text: data.answer, steps: data.steps }]);
+      setMessages((m) => [
+        ...m,
+        data.error
+          ? { role: "agent", text: data.error, error: true }
+          : { role: "agent", text: data.answer, steps: data.steps },
+      ]);
       if (data.steps?.some((s: Step) => s.result?.payment)) loadWallet();
     } catch {
-      setMessages((m) => [...m, { role: "agent", text: "Could not reach the server. Is `npm run dev` still running?", error: true }]);
+      setMessages((m) => [
+        ...m,
+        { role: "agent", text: "Could not reach the server. Is `npm run dev` still running?", error: true },
+      ]);
     }
     setThinking(false);
   }
@@ -102,7 +162,7 @@ export default function Home() {
           Agentic <span className="text-primary">starter.</span>
         </h1>
         <p className="max-w-xl text-lg text-muted-foreground">
-          An AI agent that uses your tools and pays for APIs with its own wallet.
+          An AI agent that uses your tools and pays for APIs with its own crypto wallet.
         </p>
       </header>
 
@@ -114,51 +174,130 @@ export default function Home() {
               <SectionTitle num="01" title="Setup" />
             </CardHeader>
             <CardContent className="flex flex-col">
-              <SetupStep number={1} title="Add your Gemini API key" done={ready}>
-                {status && !ready && (
-                  <p className="text-muted-foreground">
-                    Paste it into <Code>.env</Code> as <Code>GEMINI_API_KEY</Code>, then restart <Code>npm run dev</Code>.{" "}
-                    <a className="text-primary underline underline-offset-4" href="https://aistudio.google.com/apikey" target="_blank" rel="noreferrer">
-                      Get a free key
-                    </a>
-                  </p>
+              {/* Step 1 */}
+              <SetupStep number={1} title="Configure Gemini API key" done={ready}>
+                {!ready || showKeyInput ? (
+                  <form onSubmit={handleSaveKey} className="flex flex-col gap-2 mt-1">
+                    <p className="text-xs text-muted-foreground">
+                      Paste your key below, or set <Code>GEMINI_API_KEY</Code> in <Code>.env</Code>.{" "}
+                      <a
+                        className="text-primary underline underline-offset-4 hover:text-primary/80"
+                        href="https://aistudio.google.com/apikey"
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        Get free key
+                      </a>
+                    </p>
+                    <div className="flex gap-2">
+                      <Input
+                        type="password"
+                        placeholder="Paste AI Studio API key..."
+                        value={apiKeyInput}
+                        onChange={(e) => setApiKeyInput(e.target.value)}
+                        className="h-8 text-xs font-mono"
+                      />
+                      <Button
+                        type="submit"
+                        size="sm"
+                        disabled={savingKey || !apiKeyInput.trim()}
+                        className="cursor-pointer whitespace-nowrap text-xs font-mono"
+                      >
+                        {savingKey ? "Saving..." : "Connect"}
+                      </Button>
+                    </div>
+                  </form>
+                ) : (
+                  <div className="flex items-center justify-between text-xs text-muted-foreground">
+                    <span className="text-green-500 font-mono flex items-center gap-1.5">
+                      <Check className="size-3.5" /> Connected to Gemini
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowKeyInput(true)}
+                      className="text-[11px] underline hover:text-primary cursor-pointer font-mono"
+                    >
+                      Change Key
+                    </button>
+                  </div>
                 )}
-                {ready && <p className="text-muted-foreground">Connected.</p>}
               </SetupStep>
 
+              {/* Step 2 */}
               <SetupStep number={2} title="Create the agent wallet" done={Boolean(wallet?.address)}>
                 {wallet && !wallet.address && (
                   <div className="flex flex-col gap-3">
-                    <p className="text-muted-foreground">The agent signs payments with this wallet to use paid APIs.</p>
-                    <Button onClick={createWallet} disabled={creating} className="w-fit font-mono tracking-wider uppercase">
-                      <Wallet /> {creating ? "Creating..." : "Create wallet"}
+                    <p className="text-xs text-muted-foreground">
+                      The agent signs cryptographic payments with this wallet to unlock paid APIs.
+                    </p>
+                    <Button
+                      onClick={() => createWallet(false)}
+                      disabled={creating}
+                      className="w-fit font-mono tracking-wider uppercase cursor-pointer"
+                    >
+                      <Wallet className="size-4 mr-2" /> {creating ? "Creating..." : "Create wallet"}
                     </Button>
                   </div>
                 )}
-                {wallet?.address && <WalletDetails wallet={wallet} onRefresh={loadWallet} />}
+                {wallet?.address && (
+                  <WalletDetails
+                    wallet={wallet}
+                    onRefresh={loadWallet}
+                    onReset={() => createWallet(true)}
+                  />
+                )}
               </SetupStep>
 
-              <SetupStep number={3} title="Chat with your agent" done={messages.some((m) => m.role === "agent" && !m.error)} last>
-                <p className="text-muted-foreground">Pick an example prompt, or ask anything.</p>
+              {/* Step 3 */}
+              <SetupStep
+                number={3}
+                title="Chat with your agent"
+                done={messages.some((m) => m.role === "agent" && !m.error)}
+                last
+              >
+                <p className="text-xs text-muted-foreground">
+                  Pick any example prompt below or test one of the 7 custom tools.
+                </p>
               </SetupStep>
             </CardContent>
           </Card>
 
+          {/* Tools Card */}
           <Card>
             <CardHeader>
               <SectionTitle num="02" title="Tools" />
             </CardHeader>
-            <CardContent className="flex flex-col gap-4">
-              {status?.tools.map((t) => (
-                <div key={t.name}>
-                  <p className="font-mono text-sm">
-                    <span className="text-primary">&gt;</span> {t.name}
-                  </p>
-                  <p className="mt-1 text-muted-foreground">{t.description}</p>
-                </div>
-              ))}
-              <p className="border-t pt-4 text-muted-foreground">
-                Add your own in <Code>agent/tools.ts</Code>. Save, and it shows up here.
+            <CardContent className="flex flex-col gap-3">
+              {status?.tools.map((t) => {
+                const sample = TOOL_PROMPTS[t.name];
+                return (
+                  <div
+                    key={t.name}
+                    onClick={() => {
+                      if (sample) {
+                        setInput(sample);
+                        send(sample);
+                      }
+                    }}
+                    className="group -mx-2 p-2 rounded-sm hover:bg-muted/60 transition-colors cursor-pointer border border-transparent hover:border-border"
+                    title={sample ? `Click to run: "${sample}"` : undefined}
+                  >
+                    <p className="font-mono text-xs flex items-center justify-between">
+                      <span className="font-semibold text-foreground group-hover:text-primary transition-colors">
+                        <span className="text-primary font-bold">&gt;</span> {t.name}
+                      </span>
+                      {sample && (
+                        <span className="text-[10px] font-mono text-primary opacity-0 group-hover:opacity-100 transition-opacity uppercase">
+                          Try ↵
+                        </span>
+                      )}
+                    </p>
+                    <p className="mt-0.5 text-xs text-muted-foreground leading-relaxed">{t.description}</p>
+                  </div>
+                );
+              })}
+              <p className="border-t border-border pt-3 text-xs text-muted-foreground">
+                Add more tools in <Code>agent/tools.ts</Code>. All tools reload dynamically.
               </p>
             </CardContent>
           </Card>
@@ -166,11 +305,17 @@ export default function Home() {
 
         {/* Right: chat */}
         <Card className="flex h-[calc(100vh-4rem)] min-h-[560px] flex-col lg:sticky lg:top-8">
-          <CardHeader className="border-b">
+          <CardHeader className="border-b border-border">
             <SectionTitle num="03" title="Chat" />
             <CardAction>
-              <Button variant="ghost" size="sm" className="font-mono uppercase" onClick={() => setMessages([])} disabled={messages.length === 0 || thinking}>
-                <RotateCcw /> Clear
+              <Button
+                variant="ghost"
+                size="sm"
+                className="font-mono uppercase cursor-pointer hover:bg-muted"
+                onClick={() => setMessages([])}
+                disabled={messages.length === 0 || thinking}
+              >
+                <RotateCcw className="size-3.5 mr-1" /> Clear
               </Button>
             </CardAction>
           </CardHeader>
@@ -178,25 +323,31 @@ export default function Home() {
           <ScrollArea className="min-h-0 flex-1">
             <div className="flex flex-col gap-5 px-4 py-4">
               {messages.length === 0 && (
-                <div className="flex flex-col items-center gap-5 py-16 text-center">
-                  <div className="flex size-12 items-center justify-center bg-primary text-primary-foreground">
+                <div className="flex flex-col items-center gap-5 py-12 text-center">
+                  <div className="flex size-12 items-center justify-center bg-primary text-primary-foreground rounded-sm">
                     <Bot className="size-6" />
                   </div>
                   <div>
                     <p className="text-2xl font-bold tracking-tight uppercase">Ask your agent something</p>
-                    <p className="mt-1 text-muted-foreground">
+                    <p className="mt-1 text-sm text-muted-foreground">
                       {!ready
-                        ? "Add your Gemini API key to start."
-                        : wallet && !wallet.address
-                          ? "Tip: create a wallet first so the agent can pay for the weather API."
-                          : "Pick an example to start."}
+                        ? "Tip: Connect your Gemini API key in Step 01 to unlock live model answers."
+                        : "Click any prompt chip to execute tools and test autonomous micropayments."}
                     </p>
                   </div>
-                  <div className="flex flex-wrap justify-center gap-2">
+                  <div className="flex flex-wrap justify-center gap-2 max-w-xl">
                     {EXAMPLES.map((e) => (
-                      <Button key={e} variant="outline" onClick={() => send(e)} disabled={!ready} className="font-mono">
-                        <span className="text-primary">&gt;</span> {e}
-                      </Button>
+                      <button
+                        key={e}
+                        type="button"
+                        onClick={() => {
+                          setInput(e);
+                          send(e);
+                        }}
+                        className="inline-flex items-center gap-1.5 border border-border bg-background px-3 py-1.5 text-xs font-mono hover:border-primary hover:bg-primary/5 transition-all cursor-pointer rounded-sm"
+                      >
+                        <span className="text-primary font-bold">&gt;</span> {e}
+                      </button>
                     ))}
                   </div>
                 </div>
@@ -204,17 +355,24 @@ export default function Home() {
 
               {messages.map((m, i) =>
                 m.role === "user" ? (
-                  <div key={i} className="max-w-[85%] self-end bg-primary px-4 py-2.5 font-medium text-primary-foreground">
+                  <div key={i} className="max-w-[85%] self-end bg-primary px-4 py-2.5 font-medium text-primary-foreground rounded-sm text-sm">
                     {m.text}
                   </div>
                 ) : (
                   <div key={i} className="flex max-w-[85%] gap-3 self-start">
-                    <div className="flex size-8 shrink-0 items-center justify-center border">
+                    <div className="flex size-8 shrink-0 items-center justify-center border border-border rounded-sm bg-muted/30">
                       <Bot className="size-4 text-primary" />
                     </div>
                     <div className="flex min-w-0 flex-col gap-2">
-                      {m.steps?.map((s, j) => <ToolCall key={j} step={s} />)}
-                      <div className={cn("px-4 py-2.5 whitespace-pre-wrap", m.error ? "flex gap-2 bg-destructive/10 text-destructive" : "bg-muted")}>
+                      {m.steps?.map((s, j) => (
+                        <ToolCall key={j} step={s} />
+                      ))}
+                      <div
+                        className={cn(
+                          "px-4 py-2.5 whitespace-pre-wrap rounded-sm text-sm",
+                          m.error ? "flex gap-2 bg-destructive/10 text-destructive border border-destructive/20" : "bg-muted text-foreground"
+                        )}
+                      >
                         {m.error && <CircleAlert className="mt-0.5 size-4 shrink-0" />}
                         {m.text}
                       </div>
@@ -224,15 +382,15 @@ export default function Home() {
               )}
 
               {thinking && (
-                <p className="flex items-center gap-2 font-mono text-sm text-muted-foreground">
-                  agent is thinking <span className="inline-block h-4 w-2 animate-pulse bg-primary" />
+                <p className="flex items-center gap-2 font-mono text-xs text-muted-foreground">
+                  agent is thinking <span className="inline-block h-3 w-1.5 animate-pulse bg-primary" />
                 </p>
               )}
               <div ref={bottomRef} />
             </div>
           </ScrollArea>
 
-          <CardFooter className="border-t pt-4">
+          <CardFooter className="border-t border-border pt-4">
             <form
               className="flex w-full gap-2"
               onSubmit={(e) => {
@@ -240,18 +398,22 @@ export default function Home() {
                 send(input);
               }}
             >
-              <div className={cn("flex flex-1 items-center border border-input bg-background focus-within:border-primary", !ready && "opacity-50")}>
-                <span className="pl-3 font-mono text-base whitespace-nowrap text-muted-foreground md:text-sm">~/agent $</span>
+              <div className="flex flex-1 items-center border border-input bg-background focus-within:border-primary rounded-sm transition-colors">
+                <span className="pl-3 font-mono text-base whitespace-nowrap text-muted-foreground md:text-xs">~/agent $</span>
                 <Input
                   value={input}
                   onChange={(e) => setInput(e.target.value)}
-                  placeholder={ready ? "ask your agent something..." : "add your Gemini API key to start"}
-                  disabled={!ready}
-                  className="h-11 border-0 bg-transparent font-mono focus-visible:ring-0 disabled:bg-transparent disabled:opacity-100 dark:bg-transparent dark:disabled:bg-transparent"
+                  placeholder={ready ? "ask your agent something..." : "ask something or enter your API key in Step 01..."}
+                  className="h-11 border-0 bg-transparent font-mono focus-visible:ring-0 text-sm"
                 />
               </div>
-              <Button type="submit" className="h-auto px-5" disabled={!ready || thinking || !input.trim()} aria-label="Send">
-                <SendHorizontal />
+              <Button
+                type="submit"
+                className="h-auto px-5 cursor-pointer bg-primary text-primary-foreground hover:bg-primary/90 transition-colors"
+                disabled={thinking || !input.trim()}
+                aria-label="Send"
+              >
+                <SendHorizontal className="size-4" />
               </Button>
             </form>
           </CardFooter>
@@ -268,14 +430,14 @@ function Label({ children }: { children: React.ReactNode }) {
 function SectionTitle({ num, title }: { num: string; title: string }) {
   return (
     <p className="font-mono text-xs font-medium tracking-[0.06em] uppercase">
-      <span className="text-primary">{num}</span>
+      <span className="text-primary font-bold">{num}</span>
       <span className="ml-3 text-muted-foreground">{title}</span>
     </p>
   );
 }
 
 function Code({ children }: { children: React.ReactNode }) {
-  return <code className="bg-muted px-1 py-0.5 font-mono text-[0.85em] text-foreground">{children}</code>;
+  return <code className="bg-muted px-1 py-0.5 font-mono text-[0.85em] text-foreground rounded-xs">{children}</code>;
 }
 
 function SetupStep(props: { number: number; title: string; done: boolean; last?: boolean; children: React.ReactNode }) {
@@ -284,7 +446,7 @@ function SetupStep(props: { number: number; title: string; done: boolean; last?:
       <div className="flex flex-col items-center">
         <span
           className={cn(
-            "flex size-6 shrink-0 items-center justify-center border-2 font-mono text-xs font-bold",
+            "flex size-6 shrink-0 items-center justify-center border-2 font-mono text-xs font-bold rounded-sm transition-colors",
             props.done ? "border-primary bg-primary text-primary-foreground" : "border-primary text-primary"
           )}
         >
@@ -292,77 +454,155 @@ function SetupStep(props: { number: number; title: string; done: boolean; last?:
         </span>
         {!props.last && <span className={cn("w-0.5 flex-1", props.done ? "bg-primary" : "bg-border")} />}
       </div>
-      <div className={cn("flex min-w-0 flex-1 flex-col gap-2", !props.last && "pb-6")}>
-        <p className="font-bold tracking-tight uppercase">{props.title}</p>
+      <div className={cn("flex min-w-0 flex-1 flex-col gap-1.5", !props.last && "pb-5")}>
+        <p className="font-bold tracking-tight uppercase text-xs">{props.title}</p>
         {props.children}
       </div>
     </div>
   );
 }
 
-function WalletDetails({ wallet, onRefresh }: { wallet: WalletInfo; onRefresh: () => void }) {
+function WalletDetails({
+  wallet,
+  onRefresh,
+  onReset,
+}: {
+  wallet: WalletInfo;
+  onRefresh: () => void;
+  onReset: () => void;
+}) {
   const [copied, setCopied] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const address = wallet.address!;
 
-  function copy() {
-    navigator.clipboard.writeText(address);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 1500);
+  async function copy() {
+    try {
+      await navigator.clipboard.writeText(address);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = address;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      document.body.removeChild(ta);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    }
+  }
+
+  async function handleRefresh() {
+    setRefreshing(true);
+    await onRefresh();
+    setTimeout(() => setRefreshing(false), 400);
   }
 
   return (
-    <div className="flex flex-col gap-3 border bg-background p-3">
+    <div className="flex flex-col gap-2.5 border border-border bg-background p-3 rounded-sm">
       <div className="flex items-center justify-between gap-2">
-        <code className="truncate font-mono text-xs text-primary">{address}</code>
-        <Button variant="ghost" size="icon-xs" onClick={copy} aria-label="Copy address">
-          {copied ? <Check /> : <Copy />}
+        <code className="truncate font-mono text-xs text-primary select-all">{address}</code>
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          onClick={copy}
+          className="cursor-pointer hover:bg-muted"
+          aria-label="Copy address"
+          title="Copy address"
+        >
+          {copied ? <Check className="size-3.5 text-green-500" /> : <Copy className="size-3.5" />}
         </Button>
       </div>
       <div className="flex items-center justify-between font-mono text-xs text-muted-foreground uppercase">
         <span>
-          Balance <span className="text-foreground">{wallet.balance}</span>
+          Balance: <span className="text-foreground font-semibold">{wallet.balance || "0 ETH"}</span>
         </span>
-        <Button variant="ghost" size="icon-xs" onClick={onRefresh} aria-label="Refresh balance">
-          <RefreshCw />
+        <Button
+          variant="ghost"
+          size="icon-xs"
+          onClick={handleRefresh}
+          className="cursor-pointer hover:bg-muted"
+          aria-label="Refresh balance"
+          title="Refresh balance"
+        >
+          <RefreshCw className={cn("size-3.5", refreshing && "animate-spin text-primary")} />
         </Button>
       </div>
-      <div className="flex flex-wrap gap-x-4 gap-y-1 border-t pt-3 font-mono text-xs uppercase">
-        <a className="inline-flex items-center gap-1 hover:text-primary" href={`https://sepolia.basescan.org/address/${address}`} target="_blank" rel="noreferrer">
-          Explorer <ExternalLink className="size-3" />
-        </a>
-        <a className="inline-flex items-center gap-1 hover:text-primary" href="https://docs.base.org/base-chain/tools/network-faucets" target="_blank" rel="noreferrer">
-          Get test ETH <ExternalLink className="size-3" />
-        </a>
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1 border-t border-border pt-2.5 font-mono text-[11px] uppercase">
+        <div className="flex gap-3">
+          <a
+            className="inline-flex items-center gap-1 hover:text-primary transition-colors cursor-pointer"
+            href={`https://sepolia.basescan.org/address/${address}`}
+            target="_blank"
+            rel="noreferrer"
+          >
+            Explorer <ExternalLink className="size-3" />
+          </a>
+          <a
+            className="inline-flex items-center gap-1 hover:text-primary transition-colors cursor-pointer"
+            href="https://docs.base.org/base-chain/tools/network-faucets"
+            target="_blank"
+            rel="noreferrer"
+          >
+            Faucet <ExternalLink className="size-3" />
+          </a>
+        </div>
+        <button
+          type="button"
+          onClick={onReset}
+          className="text-muted-foreground hover:text-primary underline cursor-pointer text-[10px]"
+          title="Generate fresh test wallet"
+        >
+          New Wallet
+        </button>
       </div>
-      <p className="text-xs text-muted-foreground">Base Sepolia testnet. Saved in .agent-wallet.json.</p>
+      <p className="text-[11px] text-muted-foreground">Base Sepolia testnet. Saved in .agent-wallet.json.</p>
     </div>
   );
 }
 
 function ToolCall({ step }: { step: Step }) {
+  const [open, setOpen] = useState(false);
   const payment = step.result?.payment;
+
   return (
-    <Collapsible className="border font-mono text-xs">
-      <CollapsibleTrigger className="group flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted">
-        <ChevronRight className="size-3.5 transition-transform group-data-[panel-open]:rotate-90" />
-        <span className="text-muted-foreground uppercase">Tool</span>
-        <span className="text-primary">{step.tool}</span>
-        {payment && <Badge className="ml-auto bg-blue font-mono text-foreground uppercase">Paid {payment.amount}</Badge>}
-        {step.error && <Badge variant="destructive" className="ml-auto font-mono uppercase">Failed</Badge>}
-      </CollapsibleTrigger>
-      <CollapsibleContent className="flex flex-col gap-2 border-t px-3 py-2">
-        <Json label="Input" value={step.args} />
-        <Json label="Output" value={step.result} />
-      </CollapsibleContent>
-    </Collapsible>
+    <div className="border border-border font-mono text-xs rounded-sm overflow-hidden bg-background">
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="group flex w-full items-center gap-2 px-3 py-2 text-left hover:bg-muted/70 cursor-pointer transition-colors"
+      >
+        <ChevronRight className={cn("size-3.5 transition-transform text-muted-foreground", open && "rotate-90")} />
+        <span className="text-muted-foreground uppercase text-[10px]">Tool:</span>
+        <span className="text-primary font-semibold">{step.tool}</span>
+        {payment && (
+          <Badge className="ml-auto bg-blue-600/15 text-blue-400 border border-blue-500/30 font-mono text-[10px] uppercase">
+            Paid {payment.amount}
+          </Badge>
+        )}
+        {step.error && (
+          <Badge variant="destructive" className="ml-auto font-mono uppercase text-[10px]">
+            Failed
+          </Badge>
+        )}
+      </button>
+      {open && (
+        <div className="flex flex-col gap-2 border-t border-border px-3 py-2 bg-muted/20">
+          <Json label="Input" value={step.args} />
+          <Json label="Output" value={step.result} />
+        </div>
+      )}
+    </div>
   );
 }
 
 function Json({ label, value }: { label: string; value: unknown }) {
   return (
     <div>
-      <p className="mb-1 text-muted-foreground uppercase">{label}</p>
-      <pre className="overflow-x-auto bg-background p-2">{JSON.stringify(value, null, 2)}</pre>
+      <p className="mb-1 text-muted-foreground text-[10px] uppercase font-mono">{label}</p>
+      <pre className="overflow-x-auto bg-background p-2 border border-border text-[11px] font-mono rounded-xs">
+        {JSON.stringify(value, null, 2)}
+      </pre>
     </div>
   );
 }

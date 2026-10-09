@@ -37,8 +37,8 @@ function requireAccount() {
 }
 
 /** Make a brand new wallet and save it. */
-export function createWallet() {
-  if (loadAccount()) return getWalletAddress();
+export function createWallet(forceNew = false) {
+  if (!forceNew && loadAccount()) return getWalletAddress();
   const privateKey = generatePrivateKey();
   fs.writeFileSync(WALLET_FILE, JSON.stringify({ privateKey }, null, 2));
   return privateKeyToAccount(privateKey).address;

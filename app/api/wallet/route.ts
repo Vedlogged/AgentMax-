@@ -9,7 +9,16 @@ export async function GET() {
   return Response.json({ address, balance });
 }
 
-// POST /api/wallet -> create the agent's wallet
-export async function POST() {
-  return Response.json({ address: createWallet() });
+// POST /api/wallet -> create or reset the agent's wallet
+export async function POST(req: Request) {
+  let reset = false;
+  try {
+    const body = await req.json();
+    reset = Boolean(body?.reset);
+  } catch {
+    // plain POST without body
+  }
+  const address = createWallet(reset);
+  const balance = await getWalletBalance().catch(() => "0 ETH");
+  return Response.json({ address, balance });
 }
