@@ -11,15 +11,19 @@ export async function POST(req: Request) {
     const trimmed = apiKey.trim();
     process.env.GEMINI_API_KEY = trimmed;
 
-    // Persist to .env file
-    const envPath = path.join(process.cwd(), ".env");
-    let content = fs.existsSync(envPath) ? fs.readFileSync(envPath, "utf8") : "";
-    if (content.includes("GEMINI_API_KEY=")) {
-      content = content.replace(/GEMINI_API_KEY=.*/, `GEMINI_API_KEY=${trimmed}`);
-    } else {
-      content += `\nGEMINI_API_KEY=${trimmed}\n`;
+    // Persist to .env if local filesystem is writable (non-Vercel environment)
+    try {
+      const envPath = path.join(process.cwd(), ".env");
+      let content = fs.existsSync(envPath) ? fs.readFileSync(envPath, "utf8") : "";
+      if (content.includes("GEMINI_API_KEY=")) {
+        content = content.replace(/GEMINI_API_KEY=.*/, `GEMINI_API_KEY=${trimmed}`);
+      } else {
+        content += `\nGEMINI_API_KEY=${trimmed}\n`;
+      }
+      fs.writeFileSync(envPath, content);
+    } catch {
+      // Vercel serverless functions have a read-only filesystem; memory process.env handles it
     }
-    fs.writeFileSync(envPath, content);
 
     return Response.json({ success: true, hasApiKey: true });
   } catch (err) {

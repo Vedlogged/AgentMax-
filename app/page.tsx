@@ -82,6 +82,8 @@ export default function Home() {
   const [creating, setCreating] = useState(false);
   const bottomRef = useRef<HTMLDivElement>(null);
 
+  const [activeApiKey, setActiveApiKey] = useState("");
+
   const loadStatus = () =>
     fetch("/api/agent")
       .then((r) => r.json())
@@ -97,6 +99,12 @@ export default function Home() {
   useEffect(() => {
     loadStatus();
     loadWallet();
+    try {
+      const saved = localStorage.getItem("agent_gemini_api_key");
+      if (saved) {
+        setActiveApiKey(saved);
+      }
+    } catch {}
   }, []);
 
   useEffect(() => {
@@ -116,28 +124,43 @@ export default function Home() {
 
   async function handleSaveKey(e?: React.FormEvent) {
     if (e) e.preventDefault();
-    if (!apiKeyInput.trim()) return;
+    const trimmed = apiKeyInput.trim();
+    if (!trimmed) return;
     setSavingKey(true);
     try {
-      const res = await fetch("/api/config", {
+      localStorage.setItem("agent_gemini_api_key", trimmed);
+      setActiveApiKey(trimmed);
+      setShowKeyInput(false);
+      setApiKeyInput("");
+
+      await fetch("/api/config", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ apiKey: apiKeyInput.trim() }),
-      });
-      const data = await res.json();
-      if (data.success) {
-        setShowKeyInput(false);
-        setApiKeyInput("");
-        await loadStatus();
-      }
-    } catch {
-      // ignore
-    }
+        body: JSON.stringify({ apiKey: trimmed }),
+      }).catch(() => {});
+
+      await loadStatus();
+    } catch {}
     setSavingKey(false);
   }
 
   async function send(text: string) {
     if (!text.trim() || thinking) return;
+
+    if (!ready) {
+      setShowKeyInput(true);
+      setMessages((m) => [
+        ...m,
+        { role: "user", text },
+        {
+          role: "agent",
+          text: "🔑 Gemini API key needed: Please enter your key in Setup Step 01 above and click Connect.",
+          error: true,
+        },
+      ]);
+      return;
+    }
+
     const history: Message[] = [...messages, { role: "user", text }];
     setMessages(history);
     setInput("");
@@ -148,6 +171,7 @@ export default function Home() {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          apiKey: activeApiKey || undefined,
           messages: history.filter((m) => !m.error).map(({ role, text: msgText }) => ({ role, text: msgText })),
         }),
       });
@@ -162,13 +186,13 @@ export default function Home() {
     } catch {
       setMessages((m) => [
         ...m,
-        { role: "agent", text: "Could not reach the server. Is `npm run dev` still running?", error: true },
+        { role: "agent", text: "Could not reach the server. Is the application running?", error: true },
       ]);
     }
     setThinking(false);
   }
 
-  const ready = Boolean(status?.hasApiKey);
+  const ready = Boolean(status?.hasApiKey || activeApiKey);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-[1520px] flex-col gap-10 px-4 py-8 md:px-12 md:py-12">

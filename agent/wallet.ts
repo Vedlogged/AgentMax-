@@ -19,19 +19,41 @@ import { createPublicClient, formatEther, http, verifyMessage, type Address, typ
 import { generatePrivateKey, privateKeyToAccount } from "viem/accounts";
 import { baseSepolia } from "viem/chains";
 
-const WALLET_FILE = path.join(process.cwd(), ".agent-wallet.json");
+const WALLET_FILE = process.env.VERCEL
+  ? path.join("/tmp", ".agent-wallet.json")
+  : path.join(process.cwd(), ".agent-wallet.json");
 const chain = createPublicClient({ chain: baseSepolia, transport: http() });
 
 export type Payment = { from: Address; to: Address; amount: string; asset: string; resource: string; nonce: string };
 
-/** The wallet from .env or .agent-wallet.json, or null if none was created yet. */
+let memoryPrivateKey: Hex | null = null;
+
+/** The wallet from .env or .agent-wallet.json or memory */
 function loadAccount() {
-  const key = process.env.WALLET_PRIVATE_KEY || (fs.existsSync(WALLET_FILE) && JSON.parse(fs.readFileSync(WALLET_FILE, "utf8")).privateKey);
-  return key ? privateKeyToAccount(key as Hex) : null;
+  if (process.env.WALLET_PRIVATE_KEY) {
+    return privateKeyToAccount(process.env.WALLET_PRIVATE_KEY as Hex);
+  }
+  if (memoryPrivateKey) {
+    return privateKeyToAccount(memoryPrivateKey);
+  }
+  try {
+    if (fs.existsSync(WALLET_FILE)) {
+      const data = JSON.parse(fs.readFileSync(WALLET_FILE, "utf8"));
+      if (data.privateKey) {
+        memoryPrivateKey = data.privateKey as Hex;
+        return privateKeyToAccount(memoryPrivateKey);
+      }
+    }
+  } catch {}
+  return null;
 }
 
 function requireAccount() {
-  const account = loadAccount();
+  let account = loadAccount();
+  if (!account) {
+    createWallet();
+    account = loadAccount();
+  }
   if (!account) throw new Error("The agent has no wallet yet. Ask the user to click 'Create wallet' first.");
   return account;
 }
@@ -40,7 +62,12 @@ function requireAccount() {
 export function createWallet(forceNew = false) {
   if (!forceNew && loadAccount()) return getWalletAddress();
   const privateKey = generatePrivateKey();
-  fs.writeFileSync(WALLET_FILE, JSON.stringify({ privateKey }, null, 2));
+  memoryPrivateKey = privateKey;
+  try {
+    fs.writeFileSync(WALLET_FILE, JSON.stringify({ privateKey }, null, 2));
+  } catch {
+    // on read-only file systems like Vercel, memoryPrivateKey keeps the wallet active
+  }
   return privateKeyToAccount(privateKey).address;
 }
 
