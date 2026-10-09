@@ -28,18 +28,41 @@ type Status = { hasApiKey: boolean; model: string; tools: { name: string; descri
 type WalletInfo = { address: string | null; balance?: string };
 
 const EXAMPLES = [
-  "What's the weather in Mumbai?",
+  "Scan trending tokens, live ETH price, and Base gas fees",
+  "Generate a deep research report on Solana",
   "Get market intel on ETH",
+  "What is the current gas price on Base Sepolia?",
+  "What's the weather in Mumbai?",
   "What's in your wallet?",
+  "Simulate transferring 0.005 ETH to 0x0000...dEaD",
+  "What is the price of Bitcoin?",
   "Tell me a joke",
   "What's the capital of Japan?",
-  "What is the price of Bitcoin?",
   "Roll a 20 sided dice",
+];
+
+const WORKFLOWS = [
+  {
+    title: "⚡ Market Overview Workflow",
+    prompt: "Check trending tokens, live ETH price, and Base Sepolia gas fees to give me a market overview.",
+  },
+  {
+    title: "🔍 Deep Research Workflow",
+    prompt: "Generate a deep research report on Ethereum and analyze on-chain sentiment.",
+  },
+  {
+    title: "💳 Wallet & Gas Audit",
+    prompt: "Inspect your wallet address, testnet balance, and live network gas price.",
+  },
 ];
 
 const TOOL_PROMPTS: Record<string, string> = {
   get_weather: "What's the weather in Mumbai?",
   get_market_intel: "Get market intel on ETH",
+  get_deep_research: "Generate a deep research report on Solana",
+  get_trending_tokens: "What cryptocurrencies are trending right now?",
+  get_network_gas: "What is the current gas price on Base Sepolia?",
+  transfer_test_tokens: "Simulate transferring 0.005 ETH to 0x000000000000000000000000000000000000dEaD",
   get_my_wallet: "What's in your wallet?",
   get_crypto_price: "What is the price of Bitcoin?",
   get_country_info: "What's the capital of Japan?",
@@ -154,15 +177,20 @@ export default function Home() {
         <div className="flex flex-wrap items-center justify-between gap-3">
           <Label>
             <img src="/risein-logo.svg" alt="Rise In" className="mr-3 h-5 w-auto" />
-            <span className="text-foreground">/ Agentmaxxing</span>&nbsp;starter kit
+            <span className="text-foreground">/ Agentmaxxing</span>&nbsp;Week 2 Build & Ship
           </Label>
-          {status && <Label>Model: {status.model}</Label>}
+          <div className="flex items-center gap-2">
+            <span className="rounded-xs bg-primary/10 border border-primary/20 px-2 py-0.5 text-[11px] text-primary font-mono uppercase">
+              11 Tools Active
+            </span>
+            {status && <Label>Model: {status.model}</Label>}
+          </div>
         </div>
         <h1 className="text-5xl leading-[0.9] font-bold tracking-[-0.045em] uppercase md:text-7xl">
-          Agentic <span className="text-primary">starter.</span>
+          Agent<span className="text-primary">Max.</span>
         </h1>
         <p className="max-w-xl text-lg text-muted-foreground">
-          An AI agent that uses your tools and pays for APIs with its own crypto wallet.
+          An autonomous Web3 AI agent with multi-step workflows, on-chain intelligence, and x402 micropayments.
         </p>
       </header>
 
@@ -319,6 +347,27 @@ export default function Home() {
               </Button>
             </CardAction>
           </CardHeader>
+
+          {/* Week 2: Multi-Step Workflows Toolbar */}
+          <div className="flex items-center gap-2 px-4 py-2 bg-muted/30 border-b border-border overflow-x-auto text-xs font-mono">
+            <span className="text-muted-foreground uppercase text-[10px] whitespace-nowrap flex items-center gap-1 font-semibold">
+              <Sparkles className="size-3 text-primary" /> Workflows:
+            </span>
+            {WORKFLOWS.map((wf) => (
+              <button
+                key={wf.title}
+                type="button"
+                onClick={() => {
+                  setInput(wf.prompt);
+                  send(wf.prompt);
+                }}
+                className="px-2.5 py-1 bg-background border border-border hover:border-primary hover:text-primary rounded-xs transition-colors cursor-pointer whitespace-nowrap text-[11px]"
+                title={wf.prompt}
+              >
+                {wf.title}
+              </button>
+            ))}
+          </div>
 
           <ScrollArea className="min-h-0 flex-1">
             <div className="flex flex-col gap-5 px-4 py-4">
