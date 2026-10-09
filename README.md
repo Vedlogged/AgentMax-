@@ -1,71 +1,83 @@
-# AgentMax: Autonomous AI Agent with Embedded Crypto Wallet (Week 1 Submission)
+# AgentMax: Autonomous Web3 AI Agent (Week 2: Build & Ship)
 
-> **Agentmaxxing Week 1 Project**  
-> An autonomous AI agent powered by **Google Gemini** that reasons over user intent, invokes custom tools, and manages its own **Web3 cryptographic wallet** on Base Sepolia to sign and pay for API services via the **x402 payment standard**.
-
----
-
-## 🚀 Overview
-
-Traditional chatbots are purely conversational text generators. **AgentMax** is an active, autonomous **AI Agent**:
-- **Cognitive Loop**: Combines Google Gemini function-calling with a multi-step execution loop to iteratively decide, act, observe, and summarize.
-- **Embedded Web3 Wallet**: Possesses its own cryptographic identity (managed with `viem`), enabling autonomous micro-transactions and payment signing.
-- **x402 Micropayment Standard**: Automatically intercepts HTTP `402 Payment Required` responses, generates cryptographic signatures for payment, and resubmits authenticated requests.
-- **Rich Tool Ecosystem**: Equipped with multiple custom tools spanning mock paid endpoints, live crypto market data, geodata lookups, and utility functions.
+> **Agentmaxxing Week 2 Mission**  
+> An advanced autonomous AI agent powered by **Google Gemini** that combines multi-step reasoning workflows, real-time blockchain analytics, and an embedded **Web3 cryptographic wallet** on Base Sepolia to sign transactions and unlock paid APIs via the **x402 payment standard**.
 
 ---
 
-## 🛠️ Tool Directory
+## 🚀 What's New in Week 2 (Build & Ship)
 
-| Tool Name | Type | Cost / Protocol | Description |
+Week 2 evolved AgentMax from a basic prototype into a capable **autonomous Web3 intelligence agent**:
+
+1. **Expanded Tool Arsenal (11 Active Tools)**: Added deep research synthesis, live CoinGecko global trending tokens, on-chain Base Sepolia gas tracking, and cryptographically signed action receipts.
+2. **Multi-Step Agent Workflows**: AgentMax can chain disparate tools together in a single prompt (e.g. scanning trending tokens, querying live prices, inspecting on-chain gas, and delivering structured synthesis).
+3. **Multi-Tier x402 Micropayment Engine**:
+   - `get_weather`: 0.01 USDC baseline micro-purchase.
+   - `get_market_intel`: 0.05 USDC on-chain sentiment intelligence.
+   - `get_deep_research`: 0.10 USDC institutional-grade multi-dimensional research brief.
+4. **Interactive Dashboard**: Direct in-browser API key configurator, workflow shortcut toolbar, and live receipt inspection.
+5. **Detailed Walkthrough**: See [`DEMO_WALKTHROUGH.md`](./DEMO_WALKTHROUGH.md) for full step-by-step testing instructions.
+
+---
+
+## 🛠️ Complete Tool Directory (11 Tools)
+
+| Tool Name | Type | Protocol / Cost | Description |
 | :--- | :--- | :--- | :--- |
-| `get_weather` | Paid API | `0.01 USDC` (x402) | Fetches city weather after automatically signing payment from the agent's wallet. |
-| `get_market_intel` | Paid API | `0.05 USDC` (x402) | Unlocks premium on-chain sentiment and metrics with wallet signature. |
-| `get_my_wallet` | Wallet Tool | Free | Reads the agent's public address and ETH balance on Base Sepolia testnet. |
-| `get_crypto_price` | Custom Tool | Free | Retrieves live, real-time cryptocurrency prices (BTC, ETH, SOL, etc.) via Binance ticker & CoinGecko fallback. |
-| `get_country_info` | Custom Tool | Free | Fetches capital, ISO codes, and regional info with multi-source fallback. |
-| `get_joke` | Custom Tool | Free | Fetches a programming or general joke to entertain the user. |
-| `roll_dice` | Plain Tool | Free | Rolls an N-sided dice (default: 6 or user-specified). |
+| `get_deep_research` | **Paid Research** | `0.10 USDC` (x402) | Unlocks in-depth research briefs with catalysts, risk profiles, and health scores. |
+| `get_market_intel` | **Paid Intel** | `0.05 USDC` (x402) | Unlocks premium on-chain sentiment and metrics with wallet signature. |
+| `get_weather` | **Paid API** | `0.01 USDC` (x402) | Fetches city weather after automatically signing payment from the agent's wallet. |
+| `get_trending_tokens` | **Web3 Discovery** | Free | Retrieves live trending tokens globally from CoinGecko market search feeds. |
+| `get_network_gas` | **On-Chain RPC** | Free | Queries current live network gas price in Gwei on Base Sepolia. |
+| `transfer_test_tokens`| **Financial Tool** | Free | Simulates and cryptographically signs an autonomous test transfer with verifiable receipt. |
+| `get_crypto_price` | **Live Market** | Free | Queries real-time cryptocurrency prices (BTC, ETH, SOL, etc.) via Binance with fallback. |
+| `get_my_wallet` | **Wallet Tool** | Free | Reads the agent's public address and ETH balance on Base Sepolia testnet. |
+| `get_country_info` | **Knowledge** | Free | Fetches capital, ISO codes, and regional info with multi-source fallback. |
+| `get_joke` | **Utility** | Free | Fetches random programming or general jokes. |
+| `roll_dice` | **Utility** | Free | Rolls an N-sided dice (default 6, or user-specified). |
+
+---
+
+## ⚡ Multi-Step Agent Workflows
+
+AgentMax is engineered to perform complex, multi-action cognitive pipelines:
+
+- **⚡ Market Overview Workflow**:
+  - *Input*: `"Check trending tokens, live ETH price, and Base Sepolia gas fees to give me a market overview."`
+  - *Execution*: Agent chains `get_trending_tokens` ➔ `get_crypto_price` ➔ `get_network_gas` ➔ Synthesizes a structured market brief.
+- **🔍 Deep Research Workflow**:
+  - *Input*: `"Generate a deep research report on Ethereum and analyze on-chain sentiment."`
+  - *Execution*: Agent signs 0.10 USDC payment for `get_deep_research` ➔ Signs 0.05 USDC for `get_market_intel` ➔ Produces an institutional brief with payment hashes.
+- **💳 Wallet & Gas Audit Workflow**:
+  - *Input*: `"Inspect your wallet address, testnet balance, and live network gas price."`
+  - *Execution*: Chains `get_my_wallet` and `get_network_gas` to confirm transaction feasibility.
 
 ---
 
 ## 🧠 How the x402 Payment Flow Works
 
 ```
-[User Message] ──> [Gemini LLM] ──> Decides to call `get_weather` or `get_market_intel`
-                                            │
-                                            ▼
-                               [Agent sends HTTP request]
-                                            │
-                                            ▼
-                           [API responds with 402 Payment Required]
-                           (Returns price, asset, recipient address)
-                                            │
-                                            ▼
-                     [Agent Wallet signs payment message using viem]
-                                            │
-                                            ▼
-                    [Agent retries request with `X-PAYMENT` header]
-                                            │
-                                            ▼
-                     [API verifies signature and returns 200 OK]
-                                            │
-                                            ▼
-                [Gemini receives data & formulates final user answer]
+[User Request] ──> [Gemini Cognitive Loop] ──> Decides to invoke paid tool
+                                                        │
+                                                        ▼
+                                           [Agent calls API endpoint]
+                                                        │
+                                                        ▼
+                                       [API returns 402 Payment Required]
+                                       (Includes price, asset, recipient)
+                                                        │
+                                                        ▼
+                                 [Agent Wallet generates signature with viem]
+                                                        │
+                                                        ▼
+                                [Agent retries with `X-PAYMENT` base64 header]
+                                                        │
+                                                        ▼
+                                    [API verifies signature & returns 200 OK]
+                                                        │
+                                                        ▼
+                            [Gemini processes data & synthesizes final answer]
 ```
-
----
-
-## 📋 Week 1 Submission Details
-
-### 1. Short Description of What Your Agent Does
-> **AgentMax** is an autonomous AI agent integrated with a cryptographic testnet wallet on Base Sepolia. When prompted by a user, the agent uses Gemini's function-calling to analyze requirements, inspects or utilizes its testnet wallet, pays for metered services (such as weather reports and market analytics) using signed x402 headers, and fetches live real-time crypto prices, geography facts, or jokes without requiring human intervention.
-
-### 2. Brief Note on What Was Learned or Experimented With
-> - **Autonomous Agency vs. Chatbots**: Explored how agents differ from passive LLMs through observation-action loops, tool execution, and dynamic context injection.
-> - **Cryptographic Micro-Payments (x402)**: Implemented and tested how an agent can autonomously handle API paywalls by reading 402 headers, creating an off-chain cryptographic signature via `viem`, and attaching payment proof in HTTP headers.
-> - **Tool Resilience**: Built error handling and multi-provider fallbacks for external APIs (e.g. crypto prices and country queries) so agent tool execution remains robust against network or rate-limiting failures.
-> - **State & Identity Persistence**: Configured `.agent-wallet.json` to persist the agent's private key across sessions and restarts while ensuring safety via `.gitignore`.
 
 ---
 
@@ -79,8 +91,8 @@ Traditional chatbots are purely conversational text generators. **AgentMax** is 
 
 1. **Clone the repository**:
    ```bash
-   git clone <YOUR_REPOSITORY_URL>
-   cd agentmaxing
+   git clone https://github.com/Vedlogged/AgentMax-.git
+   cd AgentMax-
    ```
 
 2. **Install dependencies**:
@@ -88,57 +100,23 @@ Traditional chatbots are purely conversational text generators. **AgentMax** is 
    npm install
    ```
 
-3. **Configure your API Key**:
-   Create or edit `.env` in the root directory:
-   ```env
-   GEMINI_API_KEY=your_gemini_api_key_here
-   GEMINI_MODEL=gemini-flash-latest
-   ```
-
-4. **Start the Development Server**:
+3. **Start the Development Server**:
    ```bash
    npm run dev
    ```
    Open [http://localhost:3000](http://localhost:3000) in your browser.
 
-5. **Create / View Agent Wallet**:
-   - The agent wallet is automatically generated and persisted in `.agent-wallet.json`.
-   - In the web UI, you can view your agent's Base Sepolia address and copy or refresh the balance.
+4. **Connect Gemini API Key**:
+   - In the web UI under **01 Setup**, paste your free key from Google AI Studio and click **Connect**.
+   - (Or add `GEMINI_API_KEY=your_key_here` to `.env`).
+
+5. **Interact With Workflows**:
+   - Click any workflow shortcut button or sample prompt chip to watch the agent execute tools live!
 
 ---
 
-## 🧪 Try These Prompts
-
-- `What's the weather in Mumbai?` *(Triggers paid weather tool with 0.01 USDC wallet signature)*
-- `Get market intel on ETH` *(Triggers premium paid analytics tool with 0.05 USDC wallet signature)*
-- `What's in your wallet?` *(Inspects agent wallet address & Base Sepolia testnet balance)*
-- `What is the price of Bitcoin?` *(Fetches live crypto price)*
-- `What's the capital of Japan?` *(Queries country intelligence)*
-- `Tell me a joke` *(Retrieves a joke)*
-- `Roll a 20 sided dice` *(Executes dice roll)*
-
----
-
-## 📂 Project Architecture
-
-```
-├── agent/
-│   ├── agent.ts         # Agent loop, Gemini model setup, and system instructions
-│   ├── tools.ts         # Tool declarations and execution handlers
-│   └── wallet.ts        # viem wallet management, message signing, and verification
-├── app/
-│   ├── api/
-│   │   ├── agent/       # Agent execution endpoint
-│   │   ├── wallet/      # Wallet status endpoint
-│   │   ├── weather/     # Mock paid weather API (x402)
-│   │   └── market-intel/# Mock paid market intelligence API (x402)
-│   ├── layout.tsx       # Root layout
-│   └── page.tsx         # Modern UI with setup guide, live tool inspector, and chat
-├── components/          # Reusable UI components
-├── .env.example         # Environment variable template
-├── .gitignore           # Ignores .env and .agent-wallet.json
-└── package.json         # Scripts and project dependencies
-```
+## 🎬 Demo & Walkthrough
+Detailed instructions, script, and walkthrough steps for Week 2 evaluation can be found in [`DEMO_WALKTHROUGH.md`](./DEMO_WALKTHROUGH.md).
 
 ---
 
